@@ -1,0 +1,126 @@
+#! /bin/bash
+###
+## VLAN Setup Script
+## Copyright (C) 2006       Kyle Moffett <kyle@moffetthome.net>
+## Copyright (C) 2007-2011  eXMeritus, A Boeing Company
+##
+## This program is free software; you can redistribute it and/or modify it
+## under the terms of version 2 of the GNU General Public License, as
+## published by the Free Software Foundation.
+##
+## This program is distributed in the hope that it will be useful, but
+## WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+## or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+## for more details.
+##
+## You should have received a copy of the GNU General Public License along
+## with this program; otherwise you can obtain it here:
+##   http://www.gnu.org/licenses/gpl-2.0.txt
+###
+
+## Throw up our hands and give up on errors
+set -e
+
+## Split out the actual interface part of it
+REALIFACE="${IFACE%%:*}"
+
+## If it's an already-existent interface then clearly we don't have anything
+## to do.
+ip link show "${REALIFACE}" >/dev/null 2>&1 && exit 0
+
+## If it doesn't have "vlan-dev" set then we need to find one
+if [ -z "${IF_VLAN_DEV}" ]; then
+	## Look to see if it's in the obvious "eth0.5" or "vlan5" forms:
+	case "${REALIFACE}" in
+	?*.[0-9]|?*.[0-9][0-9]|?*.[0-9][0-9][0-9]|?*.[0-9][0-9][0-9][0-9])
+		: ## Fall through
+		;;
+	vlan[0-9]|vlan[0-9][0-9]|vlan[0-9][0-9][0-9]|vlan[0-9][0-9][0-9][0-9])
+		## Hmm, we found a VLAN interface but it doesn't have a valid
+		## "vlan-dev", so die noisily
+		cat >&2 <<EOF
+Hmm, "${IFACE}" is a VLAN interface but we can't figure out what device to
+attach it to.  Please specify one in /etc/network/interfaces like this:
+
+iface ${IFACE} inet static
+	vlan-dev eth0
+	address ${IF_ADDRESS-192.168.0.100}
+	netmask ${IF_NETMASK-255.255.255.0}
+	gateway ${IF_GATEWAY-192.168.0.1}
+
+EOF
+		exit 1
+		;;
+	*)
+		## It doesn't look at all like a VLAN device, so ignore it
+		exit 0
+		;;
+	esac
+
+	## Grab the VLAN device (and VLAN ID) from the string
+	IF_VLAN_DEV="${REALIFACE%.*}"
+	[ -n "${IF_VLAN_ID}" ] || IF_VLAN_ID="${REALIFACE##*.}"
+fi
+
+## Ok, so at this point we found a "vlan-dev" but don't have a "vlan-id"
+## Try to guess one from the name of the device
+if [ -z "${IF_VLAN_ID}" ]; then
+	case "${REALIFACE}" in
+	vlan[0-9]|vlan[0-9][0-9]|vlan[0-9][0-9][0-9]|vlan[0-9][0-9][0-9][0-9])
+		## YAY, we got one!
+		IF_VLAN_ID="${REALIFACE#vlan}"
+		;;
+	*)
+		## The only way to get here is by the user sucking at VLANs
+		cat >&2 <<EOF
+You seem to have configured "${IFACE}" as a VLAN interface but forgot to
+specify a VLAN ID.  Please set one in /etc/network/interfaces like this:
+
+iface ${IFACE} inet static
+	vlan-dev eth0
+	vlan-id 5
+	address ${IF_ADDRESS-192.168.0.100}
+	netmask ${IF_NETMASK-255.255.255.0}
+	gateway ${IF_GATEWAY-192.168.0.1}
+
+EOF
+		exit 1
+		;;
+	esac
+fi
+
+## Reprocess the vlan-id so it's just a simple number
+IF_VLAN_ID="$(expr 0 + "${IF_VLAN_ID}")"
+
+## Oh, we should probably make sure that VLAN tools are installed too
+if ! [ -x /sbin/vconfig ]; then
+	echo "ERROR: No such program: /sbin/vconfig" >&2
+	echo "  ...try 'aptitude install vlan'?" >&2
+	exit 1
+fi
+
+## So, we've got all the parameters we need, go ahead and make the magic
+## happen!
+if ! ip link show dev "${IF_VLAN_DEV}" >/dev/null 2>&1; then
+	echo "No such VLAN base device: ${IF_VLAN_DEV}" >&2
+	exit 1
+fi
+
+## We should assume that the device has already been set up.  If you want to
+## set it up properly then do so in /etc/network/interfaces.
+if [ -z "$(ip link show up "${IF_VLAN_DEV}")" ]; then
+	cat >&2 <<EOF
+Unable to bring up interface "${IFACE}" since the prerequisite interface
+"${IF_VLAN_DEV}" is not up.
+
+EOF
+	exit 1
+fi
+
+## Figure out what the auto-created VLAN interface name will be
+vconfig set_name_type DEV_PLUS_VID_NO_PAD
+autoname="${IF_VLAN_DEV}.${IF_VLAN_ID}"
+
+## Go ahead and create/rename the new interface
+vconfig add "${IF_VLAN_DEV}" "${IF_VLAN_ID}"
+ip link set dev "${autoname}" name "${REALIFACE}" multicast on

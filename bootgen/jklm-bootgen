@@ -1,0 +1,555 @@
+#! /usr/bin/perl -W
+###
+## JKLM Bootloader Configuration Generator
+## Copyright (C) 2006       Kyle Moffett <kyle@moffetthome.net>
+## Copyright (C) 2007-2011  eXMeritus, A Boeing Company
+##
+## This program is free software; you can redistribute it and/or modify it
+## under the terms of version 2 of the GNU General Public License, as
+## published by the Free Software Foundation.
+##
+## This program is distributed in the hope that it will be useful, but
+## WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+## or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+## for more details.
+##
+## You should have received a copy of the GNU General Public License along
+## with this program; otherwise you can obtain it here:
+##   http://www.gnu.org/licenses/gpl-2.0.txt
+###
+
+use strict;
+use warnings;
+
+## Work around an AptPkg bug
+@AptPkg::Config::KEYS = ();
+
+use Errno;
+use File::Glob qw();
+use AptPkg::Config qw();
+
+sub usage ( @ )
+{
+	print STDERR "\n";
+	print STDERR "@_\n" if @_;
+	print STDERR <<"EOF";
+Usage: $0 [-c <config>] [-i|-F] [-N] [<drive1> [<drive2> [...]]]
+  -c, --config:   Specify an alternate config file
+  -i, --install:  Install bootsectors on the listed drives
+  -F, --format:   Reformat the bootsectors on the listed drives
+  -N, --nonvram:  Don't modify NVRAM at all (Default: Install first drive)
+
+Regenerate a bootloader configuration for the listed drive(s), using the
+config file defaults if none are specified.
+
+The bootloader may be optionally reinstalled by specifying '--install', and
+the boot sector may be reformatted (where supported) with '--format'.
+
+The default boot order will be updated by default (where supported), but
+that may be suppressed with '--nonvram'.
+
+EOF
+	exit 1;
+}
+
+our %opt;
+our %optmap = (
+	config  => [1,'c'],
+	install	=> [0,'i'],
+	format	=> [0,'F'],
+	nonvram	=> [0,'N'],
+);
+our %shortoptmap;
+for my $opt (keys %optmap) {
+	$shortoptmap{$optmap{$opt}[1]} = $opt if $optmap{$opt}[1];
+}
+
+my @args;
+ARG:
+while (my $arg = shift @ARGV) {
+	if ($arg =~ s/^-{1,2}//) {
+		usage if $arg eq 'h' or $arg eq 'help';
+
+		my $longname;
+		if ($shortoptmap{$arg}) {
+			$longname = $shortoptmap{$arg};
+		} elsif ($optmap{$arg}) {
+			$longname = $arg;
+		}
+
+		$longname or usage "Invalid option '$arg'!";
+
+		$opt{$longname} ||= [];
+		for (1 .. $optmap{$longname}[0]) {
+			@ARGV or usage "Insufficient arguments to '$arg'! ".
+				"(wants $optmap{$longname}[0])";
+			push @{$opt{$longname}}, shift @ARGV;
+		}
+		next ARG;
+	}
+
+	push @args,$arg;
+}
+
+## Read the config file
+our $boottype;
+our $bootargs = "";
+our %disks;
+our $bpart;
+our $kpart;
+$opt{config} ||= ['/etc/jklm-bootgen.conf'];
+unless (eval { require $opt{config}[0]; 1; }) {
+	usage "Syntax error in $opt{config}[0]:\n\t$@";
+	exit 1;
+}
+
+## Check some basic config file parameters
+unless (defined $boottype) {
+	usage "Config: \$boottype not specified!\n";
+	exit 1;
+}
+unless (defined $bpart or $kpart) {
+	usage "Config: \$bpart or \$kpart not specified!\n";
+	exit 1;
+}
+unless (%disks) {
+	usage "Config: No disks present in config file!\n";
+	exit 1;
+}
+
+## Check which version of GRUB is in use
+if ($boottype eq 'grub') {
+	my($grubversion, $grub);
+	unless (open $grub, '-|', 'grub-install', '--version') {
+		print STDERR "grub-install: $!\n";
+		exit 1;
+	}
+	unless (defined($grubversion = <$grub>)) {
+		print STDERR "grub-install --version: No version found!\n";
+		exit 1;
+	}
+
+	chomp $grubversion;
+	unless ($grubversion =~ s/^grub-install //) {
+		print STDERR "grub-install didn't print its version!\n";
+		exit 1;
+	}
+
+	if ($grubversion =~ /^\(GRUB\) ([0-9.+-]+)$/) {
+		$grubversion = $1;
+	} elsif ($grubversion =~ /^\(GNU GRUB ([0-9.-]+)\)$/) {
+		$grubversion = $1;
+	} else {
+		print STDERR "Unknown GRUB version string: $grubversion\n";
+		exit 1;
+	}
+
+	## Now update the boottype
+	$boottype = ($grubversion =~ /^0\./) ? "grub1" : "grub2";
+}
+
+## Force-disable NVRAM poking unless on a supported platform
+$opt{nonvram} = 1 unless $boottype eq 'yaboot_mac';
+
+## Always "install" if "format" is specified
+$opt{install} ||= $opt{format};
+
+## Program-specific settings
+my %cf;
+my %cf_table = (
+	configfile => {
+		grub1 => 'menu.lst',
+		grub2 => 'grub.cfg',
+		yaboot_mac => 'yaboot.conf',
+		yaboot_ibm => 'yaboot.conf',
+	},
+	vimft => {
+		grub1 => 'grub',
+		grub2 => 'grub',
+		yaboot_mac => 'config',
+		yaboot_ibm => 'config',
+	},
+	devicemap => {
+		grub1 => 'device.map',
+		grub2 => 'device.map',
+	},
+	fstype => {
+		yaboot_mac => 'hfs',
+		yaboot_ibm => 'raw',
+	},
+	magicboot => {
+		yaboot_mac => 'magicboot',
+		yaboot_ibm => '#magicboot',
+	},
+	yabootbin => {
+		yaboot_mac => '/usr/lib/yaboot/yaboot',
+		yaboot_ibm => '/usr/lib/yaboot/yaboot.ibm',
+	},
+);
+
+for my $cfkey (keys %cf_table) {
+	$cf{$cfkey} = $cf_table{$cfkey}{$boottype}
+		if exists $cf_table{$cfkey}{$boottype};
+}
+
+## Make sure the config type is valid
+unless ($cf{configfile}) {
+	usage "Config file specifies invalid \$boottype: $boottype";
+	exit 1;
+}
+
+sub sort_versions ( @ )
+{
+	my $aptver = $AptPkg::Config::_config->system->versioning;
+	return sort { $aptver->compare($b, $a); } @_;
+}
+
+sub sort_disks ( @ )
+{
+	return sort { $a cmp $b } @_;
+}
+
+sub bootloader_disk_list ( $ )
+{
+	my($idisk) = @_;
+	return sort_disks(keys %disks);
+}
+
+my $bootdir;
+unless (opendir $bootdir, '/boot') {
+	print STDERR "Unable to examine /boot for bootable kernels: $!\n";
+	exit 1;
+}
+my @kern = sort_versions map { /^vmlinu[xz]-(.*)$/?($1):(); } readdir $bootdir;
+closedir $bootdir;
+my $default = $kern[0];
+
+print STDERR "Detected kernels: ".join(', ', @kern)."\n";
+
+my $hostname = `hostname`;
+unless (defined $hostname) {
+	print STDERR "hostname: $!\n";
+	exit 1;
+}
+
+chomp $hostname;
+unless ($hostname =~ s/^\s*([a-zA-Z0-9-]+)(\.[a-zA-Z0-9-]+)*\s*$/$1/) {
+	print STDERR "Invalid hostname: '$hostname'\n";
+	exit 1;
+}
+print STDERR "Detected hostname: $hostname\n";
+
+my($fstab,$root);
+unless (open $fstab, '<', '/etc/fstab') {
+	print STDERR "Unable to search /etc/fstab for '/': $!\n";
+	exit 1;
+}
+FSTAB_LINE: while (<$fstab>) {
+	s/#.*$//; s/\s+/ /g; s/^ //; s/ $//;
+	my @fields = split / /;
+	$root = $fields[0] if @fields == 6 and $fields[1] eq '/';
+}
+close $fstab;
+unless (defined $root) {
+	print STDERR "Unable to determine root filesystem!\n";
+	exit 1;
+}
+print STDERR "Detected root filesystem: $root\n";
+
+my($shadow,$rootpasswd);
+unless (open $shadow, '<', '/etc/shadow') {
+	print STDERR "Unable to read /etc/shadow: $!\n";
+	exit 1;
+}
+SHADOW_LINE: while (<$shadow>) {
+	my($user,$passwd,@other) = split /:/;
+	defined $user and defined $passwd or next SHADOW_LINE;
+	$rootpasswd = $passwd if $user eq 'root';
+}
+close $shadow;
+unless (defined $rootpasswd) {
+	print STDERR "Could not find the root password in /etc/shadow\n";
+	exit 1;
+}
+
+my %idisks;
+for my $disk (@args) {
+	defined $disks{$disk} or usage "Invalid disk '$disk'!";
+	$idisks{$disk} = 1;
+}
+
+%idisks or %idisks = map { $_ => 1 } keys %disks;
+
+sub partdev( $;$ )
+{
+	my($disk,$part) = @_;
+	return "/dev/".$disk           if not defined $part;
+	return "/dev/".$disk."p".$part if $disk =~ /[0-9]$/;
+	return "/dev/".$disk.$part;
+}
+sub bootfs( $ )
+{
+	my($disk) = @_;
+	$disk =~ s#.*/##g;
+	return "/boot/$disk";
+}
+
+IDISK:
+for my $idisk (sort_disks(keys %idisks)) {
+	my $bootfs = bootfs($idisk);
+	my $dev = partdev($idisk, $bpart);
+	my $config = $bootfs."/".$cf{configfile};
+	my $fh;
+	print "Writing $config...\n";
+	unless (open $fh, '>', $config) {
+		print STDERR "$0: $config: $!\n";
+		exit 1;
+	}
+	unless (chmod 0600, $config) {
+		print STDERR "$0: $config: $!\n";
+		exit 1;
+	}
+	print $fh <<"END_OF_SECTION";
+###
+## $config  -  Bootloader configuration file
+## (NOTE: Autogenerated by $0, DO NOT EDIT!!!)
+###
+
+END_OF_SECTION
+
+	if ($boottype eq 'grub2') {
+		print $fh <<"END_OF_SECTION";
+## Set up a nice pretty color scheme
+set menu_color_normal=cyan/blue
+set menu_color_highlight=white/blue
+
+## Require a password to boot
+## (Oops... GRUB 2 still fails at life)
+#password --md5 $rootpasswd
+
+## Boot the default image after 5 seconds
+set default="0"
+set timeout=5
+
+END_OF_SECTION
+	} elsif ($boottype eq 'grub1') {
+		print $fh <<"END_OF_SECTION";
+## Set up a nice pretty color scheme
+color cyan/blue white/blue
+
+## Require a password to boot
+password --md5 $rootpasswd
+
+## Boot the default image after 5 seconds
+default saved
+timeout 5
+
+END_OF_SECTION
+	} else {
+		print $fh <<"END_OF_SECTION";
+## Default bootstrap device
+##   There is one bootstrap device for each disk in the RAID, so that we can
+##   boot even if one disk dies and takes its bootstrap partition with it.
+boot=$dev
+ofboot=$disks{$idisk}:${bpart}
+
+## Format the bootstrap partitions as HFS
+fstype=$cf{fstype}
+
+## Install yaboot on the partition
+install=$cf{yabootbin}
+$cf{magicboot}=/usr/lib/yaboot/ofboot
+
+## Prevent Mac OS from destroying our bootstrap if it is ever booted (From a
+## CD or something)
+hide
+protect
+
+
+
+###
+## Settings for `yaboot'
+###
+
+## Default to the OpenFirmware location at which we think we are located
+device=$disks{$idisk}
+partition=$kpart
+
+## Set up a nice pretty color scheme
+fgcolor=cyan
+bgcolor=blue
+
+## Display a message at the boot prompt
+message=$disks{$idisk}:$kpart,/message
+
+## Require a password to boot with custom arguments
+password=$rootpasswd
+
+## Only use Linux on this box
+defaultos=linux
+delay=30
+
+## Boot the default image after 5 seconds
+default=$default-$idisk
+timeout=50
+
+END_OF_SECTION
+	}
+
+	print $fh <<"END_OF_SECTION";
+###
+## Linux images
+###
+
+END_OF_SECTION
+
+	for my $bdisk (bootloader_disk_list($idisk)) {
+		my $bdev = partdev($bdisk);
+		for my $kern (@kern) {
+			if ($boottype eq 'grub2') {
+				print $fh <<"END_OF_SECTION";
+menuentry "Linux $kern (raid member $bdisk)" --class debian --class gnu-linux --class gnu --class os {
+	## Load the kernel image off of ${\partdev($bdisk,$kpart)}
+	set root='($disks{$bdisk},$kpart)'
+	echo Loading vmlinuz-$kern (from $bdisk)...
+	linux /vmlinuz-$kern root=$root ro $bootargs
+
+	## Load an initrd or initramfs from the same location as the kernel
+	echo Loading initrd.img-$kern (from $bdisk)...
+	initrd /initrd.img-$kern
+}
+
+END_OF_SECTION
+			} elsif ($boottype eq 'grub1') {
+				print $fh <<"END_OF_SECTION";
+title Linux $kern (raid member $bdisk)
+	## Load the kernel image off of ${\partdev($bdisk,$kpart)}
+	root ($disks{$bdisk},${\ ($kpart - 1)})
+	kernel /vmlinuz-$kern root=$root ro $bootargs
+
+	## Load an initrd or initramfs from the same location as the kernel
+	initrd /initrd.img-$kern
+
+	## Use this kernel as a default one
+	savedefault
+
+END_OF_SECTION
+			} else {
+				print $fh <<"END_OF_SECTION";
+image=/vmlinux-$kern
+	label=$kern-$bdisk
+
+	## Load the kernel image off of /dev/$bdisk$kpart
+	device=$disks{$bdisk}
+	partition=$kpart
+
+	## Load an initrd or initramfs from the same location as the kernel
+	initrd=/initrd.img-$kern
+
+	## Mount the root filesystem
+	read-only
+	root=$root
+
+	## Don't enable SELinux yet, it's too immature
+	append="$bootargs"
+
+	## Allow booting only without parameters
+	restricted
+
+END_OF_SECTION
+			}
+		}
+	}
+	print $fh "# vim:ft=$cf{vimft}:\n";
+	close $fh;
+
+	## Write out a quick and simple device.map file if necessary
+	if ($cf{devicemap}) {
+		print "Writing $bootfs/$cf{devicemap}...\n";
+		unless (open $fh,'>',"$bootfs/$cf{devicemap}") {
+			print STDERR "$0: $bootfs/$cf{devicemap}: $!\n";
+			exit 1;
+		}
+		print $fh "($disks{$_})\t", partdev($_), "\n"
+				for bootloader_disk_list($idisk);
+		close $fh;
+	}
+
+	## Done with this drive if just regenerating configs
+	unless ($opt{install}) {
+		print "\n";
+		next IDISK;
+	}
+
+	## Print a helpful message and check that the device exists
+	my $action = $opt{format} ? "Formatting" : "Installing";
+	print "  $action boot sector for $idisk...\n";
+	unless (-b $dev) {
+		print "    Device '$dev' doesn't exist, ignoring!\n";
+		next IDISK;
+	}
+
+	## When setting up GRUB, check for a couple symlinks
+	if ($boottype eq 'grub1' or $boottype eq 'grub2') {
+		my $link = readlink "$bootfs/boot";
+		if (not defined $link) {
+			if (not $!{ENOENT}) {
+				print "    Not a symlink: $bootfs/boot\n";
+				next IDISK;
+			}
+			unless (symlink ".", "$bootfs/boot") {
+				print "    Symlink '$bootfs/boot' to '.': $!";
+				next IDISK;
+			}
+		} elsif ($link ne ".") {
+			print "    Not a symlink to '.': $bootfs/boot\n";
+			next IDISK;
+		}
+
+		$link = readlink "$bootfs/grub";
+		if (not defined $link) {
+			if (not $!{ENOENT}) {
+				print "    Not a symlink: $bootfs/grub\n";
+				next IDISK;
+			}
+			unless (symlink ".", "$bootfs/grub") {
+				print "    Symlink '$bootfs/grub' to '.': $!";
+				next IDISK;
+			}
+		} elsif ($link ne ".") {
+			print "    Not a symlink to '.': $bootfs/grub\n";
+			next IDISK;
+		}
+	}
+
+	## Figure out the command-line arguments
+	my $icmd;
+	my @iargs;
+	if ($boottype =~ /^yaboot/) {
+		$icmd = $opt{format} ? 'mkofboot' : 'ybin';
+		push @iargs, '-C', $config;
+
+		# Only change NVRAM for the first listed drive
+		push @iargs, '--nonvram' if $opt{nonvram};
+		$opt{nonvram} ||= 1;
+	} elsif ($boottype =~ /^grub/) {
+		$icmd = 'grub-install';
+		push @iargs, "--no-floppy";
+		push @iargs, "--root-directory=$bootfs";
+		push @iargs, partdev($idisk);
+	}
+
+	## Perform the requested action
+	my $inst;
+	print "    $icmd @iargs\n";
+	unless (open $inst, '-|', $icmd, @iargs) {
+		print STDERR "$icmd: $!\n";
+		next IDISK;
+	}
+	print "      $_" while <$inst>;
+	close $inst;
+	print "\n";
+}
+
+exit 0;
+

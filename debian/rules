@@ -1,0 +1,43 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+## Default target
+build:
+
+## Automatically generate the version and debian/changelog
+include make/version.mk
+
+## Unconditionally run debhelper command targets
+.PHONY: FORCE
+FORCE:
+
+## By default, pass everything through debhelper automatically
+export DH_OPTIONS
+%: debian/changelog FORCE
+	dh $@
+
+## Manual package build and clean steps
+makecfg = prefix=/usr sysconfdir=/etc
+override_dh_auto_configure: FORCE
+	@#$(MAKE) $(makecfg) config
+	@echo "Nothing to configure..."
+
+override_dh_auto_build: FORCE
+	@#$(MAKE) $(makecfg) all
+	@echo "Nothing to build..."
+
+override_dh_auto_test: FORCE
+	@#$(MAKE) $(makecfg) test
+	@echo "Nothing to test..."
+
+override_dh_auto_install: FORCE
+	@#$(MAKE) $(makecfg) DESTDIR="$(CURDIR)/debian/jklm-files" install
+	@echo "Nothing to install..."
+
+override_dh_auto_clean: FORCE
+	@#$(MAKE) $(makecfg) clean
+	@echo "Nothing to clean..."
+
+# vim:set ft=make:

@@ -1,0 +1,8 @@
+##############################################################################
+# Debian Testing tree                                                        #
+##############################################################################
+deb     http://rocky-mountain.csail.mit.edu/debian/	testing		main contrib non-free
+deb-src http://rocky-mountain.csail.mit.edu/debian/	testing		main contrib non-free
+deb     http://security.debian.org/			testing/updates	main contrib non-free
+deb-src http://security.debian.org/			testing/updates	main contrib non-free
+

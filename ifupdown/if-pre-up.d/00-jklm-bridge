@@ -1,0 +1,111 @@
+#! /bin/bash
+###
+## Software Bridging Setup Script
+## Copyright (C) 2006       Kyle Moffett <kyle@moffetthome.net>
+## Copyright (C) 2007-2011  eXMeritus, A Boeing Company
+##
+## This program is free software; you can redistribute it and/or modify it
+## under the terms of version 2 of the GNU General Public License, as
+## published by the Free Software Foundation.
+##
+## This program is distributed in the hope that it will be useful, but
+## WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+## or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+## for more details.
+##
+## You should have received a copy of the GNU General Public License along
+## with this program; otherwise you can obtain it here:
+##   http://www.gnu.org/licenses/gpl-2.0.txt
+###
+
+## Throw up our hands and give up on errors
+set -e
+
+## If it's an already-existent interface then clearly we don't have anything
+## to do:  "These aren't the droids we're looking for.  Move along."
+ip link show "${IFACE}" >/dev/null 2>&1 && exit 0
+
+## If nobody specified bridge devices then just ignore it
+[ -z "${IF_BRIDGE_DEVS+set}" ] && exit 0
+
+## If it's an alias then the user put the bridge parameters on the wrong if
+case "${IFACE}" in
+*:*)
+	echo "Cannot specify 'bridge-*' parameters on interface aliases" >&2
+	exit 1
+	;;
+esac
+
+## Build a list of devices to add to the bridge
+read -a dev_patterns <<<"${IF_BRIDGE_DEVS}"
+devs=()
+for dev in "${dev_patterns[@]}"; do
+	if [ "none" = "${dev}" ]; then
+		continue;
+	fi
+	if [ "all" = "${dev}" ]; then
+		dev='*'
+	fi
+
+	## Build a list of devices and iterate over it
+	tmp="$(cd /sys/class/net && echo $dev)"
+	read -a newdevs <<<"$tmp"
+	for newdev in "${newdevs[@]}"; do
+		## Make sure each device exists
+		if ! ip link show dev "${newdev}" >/dev/null; then
+			echo "ERROR: No such bridge port '${newdev}'" >&2
+			exit 1
+		fi
+
+		## Add it to the list of all devices
+		devs+=("${newdev}")
+	done
+done
+
+## Oh, we should probably make sure that bridging tools are installed too
+if ! [ -x /usr/sbin/brctl ]; then
+	echo "ERROR: No such program: /usr/sbin/brctl" >&2
+	echo "  ...try 'aptitude install bridge-utils'?" >&2
+	exit 1
+fi
+
+## Go ahead and create the new bridge interface
+brctl addbr "${IFACE}"
+
+## Apply configuration parameters
+[ -z "${IF_BRIDGE_AGEING_TIME}"   ] || brctl setageing     "${IFACE}" "${IF_BRIDGE_AGEING_TIME}"
+[ -z "${IF_BRIDGE_PRIORITY}"      ] || brctl setbridgeprio "${IFACE}" "${IF_BRIDGE_PRIORITY}"
+[ -z "${IF_BRIDGE_FORWARD_DELAY}" ] || brctl setfd         "${IFACE}" "${IF_BRIDGE_FORWARD_DELAY}"
+[ -z "${IF_BRIDGE_HELLO_TIME}"    ] || brctl sethello      "${IFACE}" "${IF_BRIDGE_HELLO_TIME}"
+[ -z "${IF_BRIDGE_MAX_MSG_AGE}"   ] || brctl setmaxage     "${IFACE}" "${IF_BRIDGE_MAX_MSG_AGE}"
+[ -z "${IF_BRIDGE_STP}"           ] || brctl stp           "${IFACE}" "${IF_BRIDGE_STP}"
+
+## Add all the devices to the bridge
+for dev in "${devs[@]}"; do
+	## Turn the new interface off and clean up the flags
+	ip link set dev "${dev}" down	\
+		arp on			\
+		dynamic off		\
+		multicast off		\
+		allmulticast off
+
+	## Flush addresses
+	ip addr flush dev "${dev}" 2>/dev/null
+
+	## Disable IPv6 autoconf and duplicate-address-detection
+	sysctl "net.ipv6.conf.${dev}.autoconf"=0
+	sysctl "net.ipv6.conf.${dev}.dad_transmits"=0
+
+	## Bring it up and add it to the bridge
+	ip link set dev "${dev}" up
+	brctl addif "${IFACE}" "${dev}"
+
+	## Build variable list for checking port priorities/costs
+	ifvar="$(echo "${dev}" | tr a-z A-Z | tr -c A-Z0-9_ _)"
+	costvar="IF_BRIDGE_COST_${ifvar}"
+	priovar="IF_BRIDGE_PRIO_${ifvar}"
+
+	## Optionally set port priorities/costs
+	[ -z "${!costvar}" ] || brctl setpathcost "${IFACE}" "${dev}" "${!costvar}"
+	[ -z "${!priovar}" ] || brctl setportprio "${IFACE}" "${dev}" "${!priovar}"
+done

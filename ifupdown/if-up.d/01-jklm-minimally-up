@@ -1,0 +1,60 @@
+#! /bin/bash
+###
+## Minimally Up Network Device Setup Script
+## Copyright (C) 2006       Kyle Moffett <kyle@moffetthome.net>
+## Copyright (C) 2007-2011  eXMeritus, A Boeing Company
+##
+## This program is free software; you can redistribute it and/or modify it
+## under the terms of version 2 of the GNU General Public License, as
+## published by the Free Software Foundation.
+##
+## This program is distributed in the hope that it will be useful, but
+## WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+## or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+## for more details.
+##
+## You should have received a copy of the GNU General Public License along
+## with this program; otherwise you can obtain it here:
+##   http://www.gnu.org/licenses/gpl-2.0.txt
+###
+
+## Throw up our hands and give up on errors
+set -e
+
+## If "minimally-up true" isn't set in this interfaces config then ignore it
+[ -n "${IF_MINIMALLY_UP+set}" ] || exit 0
+
+## If the interface has aliases then it can't possibly be "minimally up"
+case "${IFACE}" in
+*:*)
+	cat >&2 <<EOF
+A network interface with aliases can't *POSSIBLY* be "minimally-up"
+
+EOF
+	exit 1
+	;;
+esac
+
+## Make sure the interface exists first
+if ! ip link show "${IFACE}" >/dev/null 2>&1; then
+	cat >&2 <<EOF
+In trying to set up "${IFACE}" to be "minimally up", it doesn't seem to
+exist.  That would seem to be, to say the least, a minor problem, no?  I
+suggest making sure the network interface exists first.
+
+EOF
+	exit 1
+fi
+
+## Turn the interface off and clean up the flags
+ip link set dev "${IFACE}" down	\
+	arp on			\
+	dynamic off		\
+	multicast off		\
+	allmulticast off
+
+## Flush addresses
+ip addr flush dev "${IFACE}" 2>/dev/null
+
+## Bring the interface up with no default addresses
+ip link set dev "${IFACE}" up

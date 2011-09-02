@@ -1,0 +1,5 @@
+bootgen/kernel-img.conf		etc/
+bootgen/jklm-bootgen.conf	etc/
+bootgen/jklm-bootgen.hook	etc/kernel/postinst.d/zzz-jklm-bootgen
+bootgen/jklm-bootgen.hook	etc/kernel/postrm.d/zzz-jklm-bootgen
+bootgen/jklm-bootgen		usr/sbin/

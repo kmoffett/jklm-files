@@ -1,0 +1,87 @@
+###
+## /etc/profile: system-wide .profile file for the Bourne shell (sh(1))
+## and Bourne compatible shells (bash(1), ksh(1), ash(1), ...).
+## Copyright (C) 2006       Kyle Moffett <kyle@moffetthome.net>
+## Copyright (C) 2007-2011  eXMeritus, A Boeing Company
+##
+## This program is free software; you can redistribute it and/or modify it
+## under the terms of version 2 of the GNU General Public License, as
+## published by the Free Software Foundation.
+##
+## This program is distributed in the hope that it will be useful, but
+## WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+## or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+## for more details.
+##
+## You should have received a copy of the GNU General Public License along
+## with this program; otherwise you can obtain it here:
+##   http://www.gnu.org/licenses/gpl-2.0.txt
+###
+
+if ! declare >/dev/null 2>&1; then
+declare()
+{
+	local arg
+	for arg in "$@"; do
+		case "${arg}" in
+			(*=*)
+				local var="${arg%%=*}"
+				local val="${arg#*=}"
+				val="$(echo "${val}" | sed -e "s/'/'\\\\''/g")"
+				eval "${var}='${val}'"
+				;;
+			(*)
+				eval "${arg}=\"\${${arg}:-}\""
+				;;
+		esac
+	done
+}
+fi
+
+pathadjust__()
+{
+	local pathvar="$1"
+	local pathval="$(eval "echo \"\${${pathvar}}\"")"
+	local action="$2"
+	shift 2
+	local pathnew=""
+	for subpath in "$@"; do
+		case "${pathval}" in
+			## If it's already in the path, we're done
+			("${subpath}:"*)   ;;
+			(*":${subpath}")   ;;
+			(*":${subpath}:"*) ;;
+
+			## Otherwise, add it
+			(*) pathnew="${pathnew:+"${pathnew}:"}${subpath}" ;;
+		esac
+	done
+
+	## Now add that to our existing path
+	case "${action}" in (prepend)
+		pathval="${pathnew}${pathval:+":${pathval}"}"
+	;; (append)
+		pathval="${pathval:+"${pathval}:"}${pathnew}"
+	;; esac
+	export "${pathvar}"="${pathval}"
+}
+
+PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+pathadjust__ PATH prepend ~/sbin ~/bin
+pathadjust__ PATH append /usr/local/sbin /usr/local/bin
+pathadjust__ PATH append /usr/games
+export PATH
+
+## Other misc vars
+export VTYSH_PAGER="less -F"
+#export SSH_ASKPASS=/usr/bin/ssh-askpass-fullscreen
+
+## Run the bashrc files if we're running bash interactively
+case "${BASH:+"is-bash"}:$-" in
+	(is-bash:*i*)
+		[ -r /etc/bash.bashrc	] && . /etc/bash.bashrc
+		[ -r ~/.bashrc		] && . ~/.bashrc
+		;;
+esac
+
+# vim:ft=sh:

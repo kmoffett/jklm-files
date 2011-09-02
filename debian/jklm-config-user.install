@@ -1,0 +1,5 @@
+user/bash.bashrc	etc/
+user/bash.bash_logout	etc/
+user/inputrc		etc/
+user/profile		etc/
+user/vimrc		etc/vim/

@@ -1,0 +1,5 @@
+apt/sources.list.d/debian-squeeze.list		etc/apt/sources.list.d/
+apt/sources.list.d/debian-testing.list		etc/apt/sources.list.d/
+apt/sources.list.d/debian-unstable.list		etc/apt/sources.list.d/
+apt/sources.list.d/debian-experimental.list	etc/apt/sources.list.d/
+apt/sources.list				etc/apt/

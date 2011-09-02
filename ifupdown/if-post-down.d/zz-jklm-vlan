@@ -1,0 +1,82 @@
+#! /bin/bash
+###
+## VLAN Teardown Script
+## Copyright (C) 2006       Kyle Moffett <kyle@moffetthome.net>
+## Copyright (C) 2007-2011  eXMeritus, A Boeing Company
+##
+## This program is free software; you can redistribute it and/or modify it
+## under the terms of version 2 of the GNU General Public License, as
+## published by the Free Software Foundation.
+##
+## This program is distributed in the hope that it will be useful, but
+## WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+## or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+## for more details.
+##
+## You should have received a copy of the GNU General Public License along
+## with this program; otherwise you can obtain it here:
+##   http://www.gnu.org/licenses/gpl-2.0.txt
+###
+
+## Throw up our hands and give up on errors
+set -e
+
+## Only delete the interface if it's not an alias
+case "${IFACE}" in
+*:*)
+	exit 0
+	;;
+esac
+
+## If it doesn't exist then just ignore it and exit
+ip link show "${IFACE}" >/dev/null 2>&1 || exit 0
+
+## Only try to destroy the VLAN interface if we could have figured out how to
+## create it
+case "${IFACE}" in
+?*.[0-9]|?*.[0-9][0-9]|?*.[0-9][0-9][0-9]|?*.[0-9][0-9][0-9][0-9])
+	: ## The device even looks VLAN-ish, so it's OK to destroy it
+	;;
+vlan[0-9]|vlan[0-9][0-9]|vlan[0-9][0-9][0-9]|vlan[0-9][0-9][0-9][0-9])
+	## Make sure we have a valid device to attach it to
+	[ -n "${IF_VLAN_DEV}" ] || exit 0
+	;;
+*)
+	## Need both vlan-dev and vlan-id
+	[ -n "${IF_VLAN_DEV}" -a -n "${IF_VLAN_ID}" ] || exit 0
+	;;
+esac
+
+## Look for the device in /proc/net/vlan/config
+exec 3</proc/net/vlan/config
+read DISCARD <&3
+read DISCARD <&3
+
+## Iterate over the lines
+found=""
+while read DEV LINE <&3; do
+	if [ "x${IFACE}" = "x${DEV}" ]; then
+		## Woohoo!! We found it!!  Now we get to smash the thing we
+		## just found with a big hammer and run away.
+		found=1
+		break;
+	fi
+done
+
+## Close the /proc/net/vlan/config file
+exec 3<&-
+
+## Oh, we should probably make sure that VLAN tools are installed first
+if ! [ -x /sbin/vconfig ]; then
+	cat >&2 <<EOF
+Err... You've got what appears to be a completely *IMPOSSIBLE* configuration.
+It looks like "${IFACE}" is configured as a VLAN interface, but you don't
+seem to have the vlan tools installed (EG: The Debian "vlan" package).  Did
+you delete them?
+
+EOF
+	exit 1
+fi
+
+## Finally!!!
+vconfig rem "${IFACE}"

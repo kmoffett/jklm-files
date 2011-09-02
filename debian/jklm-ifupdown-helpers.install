@@ -1,0 +1,4 @@
+ifupdown/if-pre-up.d/*		etc/network/if-pre-up.d/
+ifupdown/if-up.d/*		etc/network/if-up.d/
+ifupdown/if-down.d/*		etc/network/if-down.d/
+ifupdown/if-post-down.d/*	etc/network/if-post-down.d/

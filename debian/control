@@ -1,0 +1,81 @@
+Source: jklm-files
+Section: misc
+Priority: extra
+Maintainer: Kyle Moffett <Kyle.D.Moffett@boeing.com>
+Build-Depends: debhelper (>= 7)
+Standards-Version: 3.7.3
+
+Package: jklm-meta-base
+Architecture: all
+Depends: acl, attr, aptitude, bash, curl, dnsutils, elinks, file, gdb, git,
+ git-doc, info, iputils-ping, iso-codes, jklm-config-user, less, sasl2-bin,
+ libsasl2-modules, libterm-readline-gnu-perl, libterm-size-perl, locales,
+ lsof, mailutils, make, man-db, manpages-dev, netcat-traditional, nmap,
+ openssl-blacklist-extra, perl, perl-doc, psmisc, pwgen, reportbug,
+ resolvconf, rsync, rsyslog, screen, socat, strace, traceroute, tshark,
+ unzip, vim, wget, whiptail, xml-core, xz-lzma, zip
+Description: Metapackage for minimal system dependencies
+ These are minimal tools that must be on every JKLM system.
+
+Package: jklm-meta-build
+Architecture: all
+Depends: autopoint, autotools-dev, binutils-multiarch, build-essential, cdbs,
+ dctrl-tools, debian-keyring, devscripts, dput, dupload, fakeroot,
+ libparse-debcontrol-perl, lintian, patchutils
+Description: Metapackage for common build dependencies
+ These are the key tools for building/rebuilding debian packages
+
+Package: jklm-meta-baremetal
+Architecture: all
+Depends: acpi-support-base, dmidecode, eject, jklm-bootgen, linux-image-amd64,
+ lvm2, mdadm, nullmailer | mail-transport-agent, ntp, ntpdate
+Description: Metapackage for bare-metal hardware dependencies
+ These are tools needed on bare-metal (nonvirtualized) systems.
+
+Package: jklm-meta-amazon-ec2
+Architecture: all
+Depends: euca2ools, grub-legacy, isc-dhcp-client, linux-image-xen-amd64,
+ lvm2, ntp, ntpdate, postfix | mail-transport-agent, xfsprogs
+Description: Metapackage for Amazon EC2 virtualization dependencies
+ These are tools needed on Amazon EC2 virtualized systems
+
+Package: jklm-meta-server
+Architecture: all
+Depends: cron-apt, debsecan, logcheck, logcheck-database,
+ openssh-blacklist-extra, openssh-server, shorewall6, shorewall-doc, xauth
+Description: Metapackage for network server dependencies
+ These are tools needed on all networked servers.
+
+Package: jklm-meta-stable
+Architecture: all
+Depends: apt-listbugs, apt-listchanges
+Description: Metapackage for stable release management dependencies
+ These are tools needed to ensure stable and reliable change-management.
+
+Package: jklm-config-apt-buildd
+Architecture: all
+Description: Standard JKLM configs - APT repositories for Debian buildds
+
+Package: jklm-config-apt-debian-prefs
+Architecture: all
+Description: Standard JKLM configs - Debian repository preference levels
+
+Package: jklm-config-apt-debian
+Architecture: all
+Description: Standard JKLM configs - Public Debian mirror
+
+Package: jklm-config-user
+Architecture: all
+Description: Standard JKLM configuration for user shells and editors
+
+Package: jklm-bootgen
+Architecture: all
+Depends: grub-pc | yaboot, libapt-pkg-perl, ${perl:Depends}, ${misc:Depends}
+Description: Bootloader configuration generator
+ Generates GRUB2 or Yaboot configuration files for JKLM-standard RAIDs.
+
+Package: jklm-ifupdown-helpers
+Architecture: all
+Description: Additional ifupdown helper scripts for advanced networking
+ These scripts make it much easier to configure network bridging, interface
+ bonding, and port VLANs.

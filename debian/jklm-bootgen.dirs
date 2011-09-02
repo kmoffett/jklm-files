@@ -1,0 +1,4 @@
+etc/
+etc/kernel/postinst.d/
+etc/kernel/postrm.d/
+usr/sbin/

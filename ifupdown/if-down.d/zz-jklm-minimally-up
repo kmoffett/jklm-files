@@ -1,0 +1,37 @@
+#! /bin/bash
+###
+## Minimally Up Network Device Teardown Script
+## Copyright (C) 2006       Kyle Moffett <kyle@moffetthome.net>
+## Copyright (C) 2007-2011  eXMeritus, A Boeing Company
+##
+## This program is free software; you can redistribute it and/or modify it
+## under the terms of version 2 of the GNU General Public License, as
+## published by the Free Software Foundation.
+##
+## This program is distributed in the hope that it will be useful, but
+## WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+## or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+## for more details.
+##
+## You should have received a copy of the GNU General Public License along
+## with this program; otherwise you can obtain it here:
+##   http://www.gnu.org/licenses/gpl-2.0.txt
+###
+
+## Throw up our hands and give up on errors
+set -e
+
+## If "minimally-up true" isn't set in this interfaces config then ignore it
+[ -n "${IF_MINIMALLY_UP+set}" ] || exit 0
+
+## If the interface has aliases then it can't possibly be "minimally up"
+case "${IFACE}" in
+*:*)
+	exit 0;
+esac
+
+## Make sure the interface exists first
+[ -d "/sys/class/net/${IFACE}" ] || exit 0
+
+## Now we can just turn it off
+ip link set dev "${IFACE}" down

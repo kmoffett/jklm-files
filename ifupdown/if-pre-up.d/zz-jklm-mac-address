@@ -1,0 +1,55 @@
+#! /bin/bash
+###
+## MAC Address Setup Script
+## Copyright (C) 2006       Kyle Moffett <kyle@moffetthome.net>
+## Copyright (C) 2007-2011  eXMeritus, A Boeing Company
+##
+## This program is free software; you can redistribute it and/or modify it
+## under the terms of version 2 of the GNU General Public License, as
+## published by the Free Software Foundation.
+##
+## This program is distributed in the hope that it will be useful, but
+## WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+## or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+## for more details.
+##
+## You should have received a copy of the GNU General Public License along
+## with this program; otherwise you can obtain it here:
+##   http://www.gnu.org/licenses/gpl-2.0.txt
+###
+
+## Throw up our hands and give up on errors
+set -e
+
+## If "mac-address" isn't set in this interfaces config then ignore it
+[ -n "${IF_MAC_ADDRESS}" -o -n "${IF_COPY_MAC_ADDRESS}" ] || exit 0
+
+## If the interface is an aliase then it can't possibly have a custom MAC
+case "${IFACE}" in
+*:*)
+	cat >&2 <<EOF
+A network interface alias can't *POSSIBLY* have a custom MAC address
+
+EOF
+	exit 1
+	;;
+esac
+
+## Iterate over all the interfaces specified in the "copy-mac-address"
+if [ -n "${IF_COPY_MAC_ADDRESS}" ]; then
+	read -a devpatterns <<<"${IF_COPY_MAC_ADDRESS}"
+	for devpattern in "${devpatterns[@]}"; do
+		read -a files <<</sys/class/net/${devpattern}/address
+		for file in "${files[@]}"; do
+			[ -f "${file}" ] || continue;
+			macaddr="$(<"${file}")"
+			[ -n "${macaddr}" ] || continue;
+			ip link set dev "${IFACE}" addr "${macaddr}" && exit 0
+		done
+	done
+fi
+
+## We didn't find any files, so default to the statically-specified address
+if [ -n "${IF_MAC_ADDRESS}" ]; then
+	ip link set dev "${IFACE}" addr "${IF_MAC_ADDRESS}"
+fi
