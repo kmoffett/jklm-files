@@ -18,6 +18,10 @@ export DH_OPTIONS
 %: debian/changelog FORCE
 	dh $@
 
+## Don't try to rebuild the debian/rules file
+debian/rules:
+	touch $@
+
 ## Manual package build and clean steps
 makecfg = prefix=/usr sysconfdir=/etc
 override_dh_auto_configure: FORCE
