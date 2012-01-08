@@ -27,10 +27,17 @@ Description: Metapackage for common build dependencies
 
 Package: jklm-meta-baremetal
 Architecture: all
-Depends: acpi-support-base, dmidecode, eject, jklm-bootgen, linux-image-amd64,
- lvm2, mdadm, nullmailer | mail-transport-agent, ntp, ntpdate
+Depends: acpi-support-base, dmidecode, eject, linux-image-amd64, lvm2,
+ nullmailer | mail-transport-agent, ntp, ntpdate
+Suggests: jklm-meta-baremetal-swraid
 Description: Metapackage for bare-metal hardware dependencies
  These are tools needed on bare-metal (nonvirtualized) systems.
+
+Package: jklm-meta-baremetal-swraid
+Architecture: all
+Depends: jklm-meta-baremetal, jklm-bootgen, mdadm
+Description: Metapackage for bare-metal software-raid dependencies
+ These are tools needed on bare-metal systems with software RAID.
 
 Package: jklm-meta-amazon-ec2
 Architecture: all
