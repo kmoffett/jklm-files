@@ -1,6 +1,5 @@
 ##############################################################################
 # Debian Unstable tree                                                       #
 ##############################################################################
-deb     http://rocky-mountain.csail.mit.edu/debian/	unstable	main contrib non-free
-deb-src http://rocky-mountain.csail.mit.edu/debian/	unstable	main contrib non-free
-
+deb     @MIRROR@			unstable	main contrib non-free
+deb-src @MIRROR@			unstable	main contrib non-free

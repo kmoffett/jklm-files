@@ -1,6 +1,5 @@
 ##############################################################################
 # Debian Experimental tree: Only for specific packages                       #
 ##############################################################################
-deb     http://rocky-mountain.csail.mit.edu/debian/	experimental	main contrib non-free
-deb-src http://rocky-mountain.csail.mit.edu/debian/	experimental	main contrib non-free
-
+deb     @MIRROR@			experimental	main contrib non-free
+deb-src @MIRROR@			experimental	main contrib non-free

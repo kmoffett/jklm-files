@@ -1,10 +1,10 @@
 ##############################################################################
 # Debian Stable tree                                                         #
 ##############################################################################
-deb     http://rocky-mountain.csail.mit.edu/debian/	squeeze		main contrib non-free
-deb-src http://rocky-mountain.csail.mit.edu/debian/	squeeze		main contrib non-free
-deb     http://rocky-mountain.csail.mit.edu/debian/	squeeze-updates	main contrib non-free
-deb-src http://rocky-mountain.csail.mit.edu/debian/	squeeze-updates	main contrib non-free
-deb     http://security.debian.org/			squeeze/updates	main contrib non-free
-deb-src http://security.debian.org/			squeeze/updates	main contrib non-free
+deb     @MIRROR@			squeeze		main contrib non-free
+deb-src @MIRROR@			squeeze		main contrib non-free
+deb     @MIRROR@			squeeze-updates	main contrib non-free
+deb-src @MIRROR@			squeeze-updates	main contrib non-free
+deb     http://security.debian.org/	squeeze/updates	main contrib non-free
+deb-src http://security.debian.org/	squeeze/updates	main contrib non-free
 

@@ -67,9 +67,13 @@ Package: jklm-config-apt-debian-prefs
 Architecture: all
 Description: Standard JKLM configs - Debian repository preference levels
 
-Package: jklm-config-apt-debian
+Package: jklm-config-apt-debian-mirror-iad
 Architecture: all
-Description: Standard JKLM configs - Public Debian mirror
+Description: Standard JKLM configs - Public Debian mirror (IAD metro)
+
+Package: jklm-config-apt-debian-mirror-nuq
+Architecture: all
+Description: Standard JKLM configs - Public Debian mirror (NUQ metro)
 
 Package: jklm-config-user
 Architecture: all

@@ -29,8 +29,7 @@ override_dh_auto_configure: FORCE
 	@echo "Nothing to configure..."
 
 override_dh_auto_build: FORCE
-	@#$(MAKE) $(makecfg) all
-	@echo "Nothing to build..."
+	@$(MAKE) $(makecfg) all
 
 override_dh_auto_test: FORCE
 	@#$(MAKE) $(makecfg) test
