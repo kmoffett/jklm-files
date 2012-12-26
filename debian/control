@@ -13,7 +13,7 @@ Depends: acl, attr, aptitude, bash, curl, dnsutils, elinks, file, gdb, git,
  lsof, mailutils, make, man-db, manpages-dev, netcat-traditional, nmap,
  openssl-blacklist-extra, perl, perl-doc, psmisc, pwgen, reportbug,
  resolvconf, rsync, rsyslog, screen, socat, strace, traceroute, tshark,
- unzip, vim, wget, whiptail, xml-core, xz-lzma, zip
+ unzip, vim, wget, whiptail, xml-core, xz-utils | xz-lzma, zip
 Description: Metapackage for minimal system dependencies
  These are minimal tools that must be on every JKLM system.
 
