@@ -26,6 +26,9 @@ color evening
 set ts=8
 set hlsearch
 
+" Make sure we allow all POSIX constructs in shell scripts
+let g:is_posix = 1
+
 " If using a dark background within the editing area and syntax highlighting
 " turn on this option as well
 "set background=dark
