@@ -47,36 +47,4 @@ vlan[0-9]|vlan[0-9][0-9]|vlan[0-9][0-9][0-9]|vlan[0-9][0-9][0-9][0-9])
 	;;
 esac
 
-## Look for the device in /proc/net/vlan/config
-exec 3</proc/net/vlan/config
-read DISCARD <&3
-read DISCARD <&3
-
-## Iterate over the lines
-found=""
-while read DEV LINE <&3; do
-	if [ "x${IFACE}" = "x${DEV}" ]; then
-		## Woohoo!! We found it!!  Now we get to smash the thing we
-		## just found with a big hammer and run away.
-		found=1
-		break;
-	fi
-done
-
-## Close the /proc/net/vlan/config file
-exec 3<&-
-
-## Oh, we should probably make sure that VLAN tools are installed first
-if ! [ -x /sbin/vconfig ]; then
-	cat >&2 <<EOF
-Err... You've got what appears to be a completely *IMPOSSIBLE* configuration.
-It looks like "${IFACE}" is configured as a VLAN interface, but you don't
-seem to have the vlan tools installed (EG: The Debian "vlan" package).  Did
-you delete them?
-
-EOF
-	exit 1
-fi
-
-## Finally!!!
-vconfig rem "${IFACE}"
+ip link delete dev "${IFACE}" type vlan id "${IF_VLAN_ID}"

@@ -92,13 +92,6 @@ fi
 ## Reprocess the vlan-id so it's just a simple number
 IF_VLAN_ID="$(expr 0 + "${IF_VLAN_ID}")"
 
-## Oh, we should probably make sure that VLAN tools are installed too
-if ! [ -x /sbin/vconfig ]; then
-	echo "ERROR: No such program: /sbin/vconfig" >&2
-	echo "  ...try 'aptitude install vlan'?" >&2
-	exit 1
-fi
-
 ## So, we've got all the parameters we need, go ahead and make the magic
 ## happen!
 if ! ip link show dev "${IF_VLAN_DEV}" >/dev/null 2>&1; then
@@ -118,9 +111,4 @@ EOF
 fi
 
 ## Figure out what the auto-created VLAN interface name will be
-vconfig set_name_type DEV_PLUS_VID_NO_PAD
-autoname="${IF_VLAN_DEV}.${IF_VLAN_ID}"
-
-## Go ahead and create/rename the new interface
-vconfig add "${IF_VLAN_DEV}" "${IF_VLAN_ID}"
-ip link set dev "${autoname}" name "${REALIFACE}" multicast on
+ip link add link "${IF_VLAN_DEV}" name "${REALIFACE}" type vlan id "${IF_VLAN_ID}"
