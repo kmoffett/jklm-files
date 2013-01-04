@@ -135,9 +135,9 @@ if ($boottype eq 'grub') {
 		exit 1;
 	}
 
-	if ($grubversion =~ /^\(GRUB\) ([0-9.+-]+)$/) {
+	if ($grubversion =~ /^\(GRUB\) ([0-9][0-9a-z.+-]+)$/) {
 		$grubversion = $1;
-	} elsif ($grubversion =~ /^\(GNU GRUB ([0-9.-]+)\)$/) {
+	} elsif ($grubversion =~ /^\(GNU GRUB ([0-9][0-9a-z.+-]+)\)$/) {
 		$grubversion = $1;
 	} else {
 		print STDERR "Unknown GRUB version string: $grubversion\n";
