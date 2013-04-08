@@ -25,6 +25,7 @@ use warnings;
 @AptPkg::Config::KEYS = ();
 
 use Errno;
+use Cwd qw();
 use File::Glob qw();
 use AptPkg::Config qw();
 
@@ -283,8 +284,9 @@ for my $disk (@args) {
 sub partdev( $;$ )
 {
 	my($disk,$part) = @_;
-	return "/dev/".$disk           if not defined $part;
-	return "/dev/".$disk."p".$part if $disk =~ /[0-9]$/;
+	return "/dev/".$disk               if not defined $part;
+	return "/dev/".$disk."-part".$part if $disk =~ m#^disk/by-(path|id)/#;
+	return "/dev/".$disk."p".$part     if $disk =~ /[0-9]$/;
 	return "/dev/".$disk.$part;
 }
 sub bootfs( $ )
@@ -404,7 +406,6 @@ END_OF_SECTION
 END_OF_SECTION
 
 	for my $bdisk (bootloader_disk_list($idisk)) {
-		my $bdev = partdev($bdisk);
 		for my $kern (@kern) {
 			if ($boottype eq 'grub2') {
 				print $fh <<"END_OF_SECTION";
@@ -496,7 +497,7 @@ END_OF_SECTION
 			print STDERR "$0: $bootfs/$cf{devicemap}: $!\n";
 			exit 1;
 		}
-		print $fh "($disks{$_})\t", partdev($_), "\n"
+		print $fh "($disks{$_})\t", Cwd::abs_path(partdev($_)), "\n"
 				for bootloader_disk_list($idisk);
 		close $fh;
 	}
@@ -562,7 +563,7 @@ END_OF_SECTION
 		$icmd = 'grub-install';
 		push @iargs, "--no-floppy";
 		push @iargs, "--root-directory=$bootfs";
-		push @iargs, partdev($idisk);
+		push @iargs, Cwd::abs_path(partdev($idisk));
 	}
 
 	## Perform the requested action
