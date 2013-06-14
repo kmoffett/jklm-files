@@ -460,6 +460,32 @@ END_OF_SECTION
 			}
 		}
 	}
+	for my $bdisk (bootloader_disk_list($idisk)) {
+		if ($boottype eq 'grub2') {
+			print $fh <<"END_OF_SECTION";
+menuentry "Switch to $bdisk MBR" --class debian --class gnu-linux --class gnu --class os {
+	echo Invoking MBR from $bdisk...
+	set root='($disks{$bdisk})'
+	chainloader +1
+}
+
+END_OF_SECTION
+		} elsif ($boottype eq 'grub1') {
+			print $fh <<"END_OF_SECTION";
+title Switch to $bdisk MBR
+	root ($disks{$bdisk})
+	chainloader +1
+
+END_OF_SECTION
+		} else {
+			print $fh <<"END_OF_SECTION";
+## We would like to put a chainloader entry here for:
+##   $bdisk
+## Unfortunately, I haven't figured out how to do that yet.
+
+END_OF_SECTION
+		}
+	}
 	print $fh "# vim:ft=$cf{vimft}:\n";
 	close $fh;
 
