@@ -1,7 +1,7 @@
 Package: *
-Pin: release n=squeeze
+Pin: release n=wheezy
 Pin-Priority: 990
 
 Package: *
-Pin: release n=squeeze-updates
+Pin: release n=wheezy-updates
 Pin-Priority: 990

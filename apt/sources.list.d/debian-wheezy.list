@@ -1,0 +1,10 @@
+##############################################################################
+# Debian Stable tree                                                         #
+##############################################################################
+deb     @MIRROR@			wheezy		main contrib non-free
+deb-src @MIRROR@			wheezy		main contrib non-free
+deb     @MIRROR@			wheezy-updates	main contrib non-free
+deb-src @MIRROR@			wheezy-updates	main contrib non-free
+deb     http://security.debian.org/	wheezy/updates	main contrib non-free
+deb-src http://security.debian.org/	wheezy/updates	main contrib non-free
+

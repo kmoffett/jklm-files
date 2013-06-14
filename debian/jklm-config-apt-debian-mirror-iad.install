@@ -1,4 +1,4 @@
-build/apt-iad/sources.list.d/debian-squeeze.list	etc/apt/sources.list.d/
+build/apt-iad/sources.list.d/debian-wheezy.list		etc/apt/sources.list.d/
 build/apt-iad/sources.list.d/debian-testing.list	etc/apt/sources.list.d/
 build/apt-iad/sources.list.d/debian-unstable.list	etc/apt/sources.list.d/
 build/apt-iad/sources.list.d/debian-experimental.list	etc/apt/sources.list.d/

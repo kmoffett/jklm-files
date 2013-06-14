@@ -1,7 +1,7 @@
 ##############################################################################
 # Debian Buildd Packages                                                     #
 ##############################################################################
-deb     https://buildd.debian.org/apt/	squeeze			main
-deb-src https://buildd.debian.org/apt/	squeeze			main
-deb     https://buildd.debian.org/apt/	squeeze-proposed	main
-deb-src https://buildd.debian.org/apt/	squeeze-proposed	main
+deb     https://buildd.debian.org/apt/	wheezy			main
+deb-src https://buildd.debian.org/apt/	wheezy			main
+deb     https://buildd.debian.org/apt/	wheezy-proposed		main
+deb-src https://buildd.debian.org/apt/	wheezy-proposed		main

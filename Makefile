@@ -10,7 +10,7 @@ include make/version.mk
 all: debian/changelog
 
 APT_DEBIAN_FILES =				\
-	sources.list.d/debian-squeeze.list	\
+	sources.list.d/debian-wheezy.list	\
 	sources.list.d/debian-testing.list	\
 	sources.list.d/debian-unstable.list	\
 	sources.list.d/debian-experimental.list
